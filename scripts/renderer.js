@@ -41,22 +41,44 @@ class Renderer {
     
     //
     moveLeft() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        let u = view.vup.cross(n);
+        u.normalize();
+        u.scale(1);
+        view.prp = view.prp.subtract(u);
+        view.srp = view.srp.subtract(u);
     }
     
     //
     moveRight() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        let u = view.vup.cross(n);
+        u.normalize();
+        u.scale(1);
+        view.prp = view.prp.add(u);
+        view.srp = view.srp.add(u);
     }
     
     //
     moveBackward() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        n.normalize();
+        n.scale(1);
+        view.prp = view.prp.add(n);
+        view.srp = view.srp.add(n);
     }
     
     //
     moveForward() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        n.normalize();
+        n.scale(1);
+        view.prp = view.prp.subtract(n);
+        view.srp = view.srp.subtract(n);
     }
 
     //
