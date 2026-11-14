@@ -46,6 +46,7 @@ let app = createApp({
                     this.renderer.moveForward();
                     break;
             }
+            this.renderer.draw();
         }
     }
 }).mount('#content');
