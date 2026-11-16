@@ -1,39 +1,92 @@
 import { Matrix, Vector } from "./matrix.js";
 
 // create a 4x4 matrix to the perspective projection / view matrix
-function mat4x4Perspective(prp, srp, vup, clip) {
+// Nper calculation
+function mat4x4Perspective(prp, srp, vup, clip) { 
     // 1. translate PRP to origin
     // 2. rotate VRC such that (u,v,n) align with (x,y,z)
     // 3. shear such that CW is on the z-axis
     // 4. scale such that view volume bounds are ([z,-z], [z,-z], [-1,zmin])
 
-    // ...
-    // let transform = Matrix.multiply([...]);
-    // return transform;
+    // convert prp, srp, vup to vectors
+    prp = Vector3(prp[0], prp[1], prp[2]);
+    srp = Vector3(srp[0], srp[1], srp[2]);
+    vup = Vector3(vup[0], vup[1], vup[2]);
+
+    // read the window boundaries and clipping distance
+    let left = clip[0];
+    let right = clip[1];
+    let bottom = clip[2];
+    let top = clip[3];
+    let near = clip[4];
+    let far = clip[5];
+
+    // ---Step 1
+    let translate = new Matrix(4, 4); // create a new 4x4 matrix to translate PRP to origin
+    mat4x4Translate(translate, -prp.x, -prp.y, -prp.z); // translate PRP to origin
+
+    // ---Step 2
+    let n = prp.subtract(srp); // n-axis points from the SRP toward the PRP
+    n.normalize();            // make n a unit vector
+    let u = vup.cross(n); // u-axis points to the right
+    u.normalize();        // make u a unit vector
+    let v = n.cross(u); // v-axis points up in the VRC
+
+    // put the VRC axes in the rows of the rotation matrix
+    let rotate = new Matrix(4, 4); // matrix R
+    rotate.values = [
+        [u.x, u.y, u.z, 0], 
+        [v.x, v.y, v.z, 0], 
+        [n.x, n.y, n.z, 0], 
+        [0, 0, 0, 1]       
+    ];
+
+    // ---Step 3
+    // dop is cw - prp. In vrc, prp is already at the origin
+    let dop = Vector3((left + right) / 2, (bottom + top) / 2, -near); 
+    
+    let shear = new Matrix(4, 4); // SHpar
+    mat4x4ShearXY(shear, -dop.x / dop.z, -dop.y / dop.z); 
+
+    // ---Step 4
+    // perspective scale matrix Sper
+    let scale = new Matrix(4, 4);
+    mat4x4Scale(scale, 
+        (2 * near) / ((right - left) * far),
+        ((2 * near) / ((top - bottom) * far)), 
+        1 / far); // scale such that view volume bounds are ([z,-z], [z,-z], [-1,zmin])
+
+    // combine the transformations into a single matrix to get Nper
+    let transform = Matrix.multiply([scale, shear, rotate, translate]);
+    return transform;
 }
 
 // create a 4x4 matrix to project a perspective image on the z=-1 plane
 function mat4x4MPer() {
     let mper = new Matrix(4, 4);
     // mper.values = ...;
+    mper.values = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, -1, 0]];    
     return mper;
 }
 
 // create a 4x4 matrix to translate/scale projected vertices to the viewport (window)
-function mat4x4Viewport(width, height) {
+function mat4x4Viewport(width, height) { // take the Canvas dimensions in pixels
+    // horizontal scale factor and half the window width
+    let halfWidth = width / 2;
+    // vertical scale factor and half the window height
+    let halfHeight = height / 2;
+
+    // viewport matrix V, with the Y row adapted for Canvas
     let viewport = new Matrix(4, 4);
-    // viewport.values = ...;
-    viewport.values = []
+    viewport.values = [[halfWidth, 0, 0, halfWidth], [0, -halfHeight, 0, halfHeight], [0, 0, 1, 0], [0, 0, 0, 1]];
     return viewport;
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////
-// 4x4 Transform Matrices                                                         //
-///////////////////////////////////////////////////////////////////////////////////
-
+////////////////////////////
+// 4x4 Transform Matrices 
+////////////////////////////                                                        
 // set values of existing 4x4 matrix to the identity matrix
-function mat4x4Identity(mat4x4) {
+function mat4x4Identity(mat4x4) { 
     mat4x4.values = [[1, 0, 0, 0],
                      [0, 1, 0, 0],
                      [0, 0, 1, 0],
