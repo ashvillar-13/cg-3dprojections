@@ -194,6 +194,112 @@ class Renderer {
         //     * project to 2D
         //     * translate/scale to viewport (i.e. window)
         //     * draw line
+
+        // first: clear canvas before drawing 
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // get camera settings from scene
+        let view = this.scene.view;
+
+        // build Nper matrix
+        let nper = CG.mat4x4Perspective([view.prp.x, view.prp.y, view.prp.z], [view.srp.x, view.srp.y, view.srp.z], [view.vup.x, view.vup.y, view.vup.z], view.clip);
+
+        // buildmper to project onto the view plane at z = -1
+        let mper = CG.mat4x4MPer();
+        
+        // build the matrix that converts projected coordinates into canvas pixels
+        let viewport = CG.mat4x4Viewport(
+            this.canvas.width,
+            this.canvas.height
+        );
+
+        // calculate the near clipping plane in canonical view coordinates
+        let zmin = -view.clip[4] / view.clip[5];
+
+        // go through each model
+        for (let i = 0; i < this.scene.models.length; i++) {
+            // get the current model
+            let model = this.scene.models[i];
+
+            // --------------------------------------------------
+            // Transform 3d models into the canonical view volume
+            // --------------------------------------------------
+
+            // apply the model transformation first and then nper
+            let transform = Matrix.multiply([nper, model.matrix]);
+
+            // store the transformed vertices
+            let canonicalVertices = [];
+
+            // go through each vertex
+            for (let j = 0; j < model.vertices.length; j++) {
+                // transform the vertex into canonical view coordinates
+                let vertex = Matrix.multiply([
+                    transform,
+                    model.vertices[j]
+                ]);
+
+                // add the transformed vertex to the array
+                canonicalVertices.push(vertex);
+            }
+
+            // go through each edge
+            for (let j = 0; j < model.edges.length; j++) {
+                // get the vertex indexes for this edge
+                let edge = model.edges[j];
+
+                // go through each line segment in the edge
+                for (let k = 0; k < edge.length - 1; k++) {
+                    // get the two endpoints in canonical view coordinates
+                    let line = {
+                        pt0: canonicalVertices[edge[k]], pt1: canonicalVertices[edge[k + 1]]
+                    };
+
+                    let clippedLine = this.clipLinePerspective(line, zmin);
+
+                    // skip line segments that are outside the view volume
+                    if (clippedLine === null) {
+                        continue;
+                    }
+
+                    // --------------------------------------------------------
+                    // Implement perspective projection onto the view plane
+                    // --------------------------------------------------------
+
+                    // project the first endpoint using mper
+                    let p0 = Matrix.multiply([mper, clippedLine.pt0]);
+
+                    // project the second endpoint using mper
+                    let p1 = Matrix.multiply([mper, clippedLine.pt1]);
+
+                    // divide first endpoint by w
+                    p0.scale(1 / p0.w);
+
+                    // divide second endpoint by w
+                    p1.scale(1 / p1.w);
+
+                    // --------------------------------------------------------
+                    // Convert projected coordinates into canvas 2d coordinates
+                    // --------------------------------------------------------
+
+                    // convert the first endpoint into canvas pixels
+                    let canvasP0 = Matrix.multiply([viewport, p0]);
+
+                    // convert the second endpoint into canvas pixels
+                    let canvasP1 = Matrix.multiply([viewport, p1]);
+
+                    // --------------------------------------------------------
+
+                    // draw the line using the canvas pixel coordinates
+                    this.drawLine(
+                        canvasP0.x,
+                        canvasP0.y,
+                        canvasP1.x,
+                        canvasP1.y
+                    );
+                }
+            }
+        }
     }
 
     // Get outcode for a vertex
@@ -341,9 +447,9 @@ class Renderer {
     drawLine(x0, y0, x1, y1) {
         this.ctx.strokeStyle = '#000000';
         this.ctx.beginPath();
-        this.ctx.moveTo(x0, y0);
-        this.ctx.lineTo(x1, y1);
-        this.ctx.stroke();
+        this.ctx.moveTo(x0, y0); // move to the first point
+        this.ctx.lineTo(x1, y1); // draw a line to the second point
+        this.ctx.stroke(); // draw the line on the canvas
 
         this.ctx.fillStyle = '#FF0000';
         this.ctx.fillRect(x0 - 2, y0 - 2, 4, 4);
