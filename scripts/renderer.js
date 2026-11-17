@@ -255,8 +255,7 @@ class Renderer {
                         pt0: canonicalVertices[edge[k]], pt1: canonicalVertices[edge[k + 1]]
                     };
 
-                    let clippedLine = this.clipLinePerspective(line, zmin);
-
+                    let clippedLine = line;
                     // skip line segments that are outside the view volume
                     if (clippedLine === null) {
                         continue;
