@@ -497,9 +497,9 @@ class Renderer {
     drawLine(x0, y0, x1, y1) {
         this.ctx.strokeStyle = '#000000';
         this.ctx.beginPath();
-        this.ctx.moveTo(x0, y0);
-        this.ctx.lineTo(x1, y1);
-        this.ctx.stroke();
+        this.ctx.moveTo(x0, y0); // move to the first point
+        this.ctx.lineTo(x1, y1); // draw a line to the second point
+        this.ctx.stroke(); // draw the line on the canvas
 
         this.ctx.fillStyle = '#FF0000';
         this.ctx.fillRect(x0 - 2, y0 - 2, 4, 4);

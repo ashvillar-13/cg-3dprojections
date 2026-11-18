@@ -1,7 +1,8 @@
 import { Matrix, Vector } from "./matrix.js";
 
 // create a 4x4 matrix to the perspective projection / view matrix
-function mat4x4Perspective(prp, srp, vup, clip) {
+// Nper calculation
+function mat4x4Perspective(prp, srp, vup, clip) { 
     // 1. translate PRP to origin
     const translate = new Matrix(4, 4);
     mat4x4Translate(translate, -prp.x, -prp.y, -prp.z);
@@ -60,7 +61,13 @@ function mat4x4MPer() {
 }
 
 // create a 4x4 matrix to translate/scale projected vertices to the viewport (window)
-function mat4x4Viewport(width, height) {
+function mat4x4Viewport(width, height) { // take the Canvas dimensions in pixels
+    // horizontal scale factor and half the window width
+    let halfWidth = width / 2;
+    // vertical scale factor and half the window height
+    let halfHeight = height / 2;
+
+    // viewport matrix V, with the Y row adapted for Canvas
     let viewport = new Matrix(4, 4);
     // viewport.values = ...;
     viewport.values = [
@@ -72,13 +79,11 @@ function mat4x4Viewport(width, height) {
     return viewport;
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////
-// 4x4 Transform Matrices                                                         //
-///////////////////////////////////////////////////////////////////////////////////
-
+////////////////////////////
+// 4x4 Transform Matrices 
+////////////////////////////                                                        
 // set values of existing 4x4 matrix to the identity matrix
-function mat4x4Identity(mat4x4) {
+function mat4x4Identity(mat4x4) { 
     mat4x4.values = [[1, 0, 0, 0],
                      [0, 1, 0, 0],
                      [0, 0, 1, 0],
