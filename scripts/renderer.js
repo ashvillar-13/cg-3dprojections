@@ -292,7 +292,13 @@ class Renderer {
                     )
                 ]);
 
-                const width = 60;
+                const imageWorldWidth = 1;
+                const distance = -center.z * clip[5];
+
+                const width = (
+                    this.canvas.width * clip[4] * imageWorldWidth
+                ) / ((clip[1] - clip[0]) * distance);
+                
                 const height = width * this.cubeImage.naturalHeight
                     / this.cubeImage.naturalWidth;
 
