@@ -19,9 +19,14 @@ class Renderer {
         this.canvas.height = canvas.height;
         this.ctx = this.canvas.getContext('2d');
         this.scene = this.processScene(scene);
-        this.enable_animation = false;  // <-- disabled for easier debugging; enable for animation
+        this.enable_animation = true;  // <-- disabled for easier debugging; enable for animation
         this.start_time = null;
         this.prev_time = null;
+
+        // Image inside cube
+        this.cubeImage = new Image();
+        this.cubeImage.onload = () => this.draw();
+        this.cubeImage.src = './hehe-boi.png';
     }
 
     // Rotate animated models around their own centers
@@ -271,6 +276,41 @@ class Renderer {
             const transformedVertices = model.vertices.map(
                 vertex => Matrix.multiply([modelView, vertex])
             );
+
+        if (model.type === 'cube' && this.cubeImage.naturalWidth > 0) {
+            const center = Matrix.multiply([modelView, model.center]);
+
+            if (this.outcodePerspective(center, -clip[4] / clip[5]) === 0) {
+                const projected = Matrix.multiply([projection, center]);
+                const screen = Matrix.multiply([
+                    viewport,
+                    CG.Vector4(
+                        projected.x / projected.w,
+                        projected.y / projected.w,
+                        0,
+                        1
+                    )
+                ]);
+
+                const width = 60;
+                const height = width * this.cubeImage.naturalHeight
+                    / this.cubeImage.naturalWidth;
+
+                this.ctx.save();
+                this.ctx.translate(screen.x, screen.y);
+                this.ctx.rotate(Math.PI);
+
+                this.ctx.drawImage(
+                    this.cubeImage,
+                    -width / 2,
+                    -height / 2,
+                    width,
+                    height
+                );
+
+                this.ctx.restore();
+            }
+        }
 
             for (const edge of model.edges) {
                 for (let i = 0; i < edge.length - 1; i++) {
