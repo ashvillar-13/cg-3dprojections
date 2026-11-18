@@ -153,32 +153,97 @@ class Renderer {
 
     //
     rotateLeft() {
+        this.rotateView(Math.PI / 180);
+        // let view = this.scene.view;
 
+        // // Direction from camera position to target
+        // let direction = view.srp.subtract(view.prp);
+
+        // const rotation = new Matrix(4, 4);
+        // CG.mat4x4RotateY(rotation, Math.PI / 180);
+
+        // const direction4 = CG.Vector4(direction.x, direction.y, direction.z, 0);
+        // const rotated = rotation.mult(direction4);
     }
     
     //
     rotateRight() {
+       this.rotateView(-Math.PI / 180);
+        // const view = this.scene.view;
+        // const direction = view.srp.subtract(view.prp);
 
+        // const rotation = new Matrix(4, 4);
+        // CG.mat4x4RotateY(rotation, -Math.PI / 180);
+
+        // const direction4 = CG.Vector4(direction.x, direction.y, direction.z, 0);
+        // const rotated = rotation.mult(direction4);
+        // const [x, y, z] = rotated.values.map(row => row[0]);
+
+        // view.srp = view.prp.add(CG.Vector3(x, y, z));
     }
     
+    rotateView(angle) {
+        const view = this.scene.view;
+        const direction = view.srp.subtract(view.prp);
+
+        const n = view.prp.subtract(view.srp);
+        n.normalize();
+
+        const u = view.vup.cross(n);
+        u.normalize();
+
+        const v = n.cross(u);
+
+        const forward = CG.Vector3(direction.x,
+    direction.y, direction.z);
+        forward.scale(Math.cos(angle));
+
+        const sideways = v.cross(direction);
+        sideways.scale(Math.sin(angle));
+
+        view.srp = view.prp.add(forward.add(sideways));
+    }
+
     //
     moveLeft() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        let u = view.vup.cross(n);
+        u.normalize();
+        u.scale(1);
+        view.prp = view.prp.subtract(u);
+        view.srp = view.srp.subtract(u);
     }
     
     //
     moveRight() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        let u = view.vup.cross(n);
+        u.normalize();
+        u.scale(1);
+        view.prp = view.prp.add(u);
+        view.srp = view.srp.add(u);
     }
     
     //
     moveBackward() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        n.normalize();
+        n.scale(1);
+        view.prp = view.prp.add(n);
+        view.srp = view.srp.add(n);
     }
     
     //
     moveForward() {
-
+        let view = this.scene.view;
+        let n = view.prp.subtract(view.srp);
+        n.normalize();
+        n.scale(1);
+        view.prp = view.prp.subtract(n);
+        view.srp = view.srp.subtract(n);
     }
 
     //
@@ -195,109 +260,45 @@ class Renderer {
         //     * translate/scale to viewport (i.e. window)
         //     * draw line
 
-        // first: clear canvas before drawing 
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // get camera settings from scene
-        let view = this.scene.view;
+        const {prp, srp, vup, clip} = this.scene.view;
+        const viewMatrix = CG.mat4x4Perspective(prp, srp, vup, clip);
+        const projection = CG.mat4x4MPer();
+        const viewport = CG.mat4x4Viewport(this.canvas.width, this.canvas.height);
 
-        // build Nper matrix
-        let nper = CG.mat4x4Perspective([view.prp.x, view.prp.y, view.prp.z], [view.srp.x, view.srp.y, view.srp.z], [view.vup.x, view.vup.y, view.vup.z], view.clip);
+        for (const model of this.scene.models) {
+            const modelView =
+        viewMatrix.mult(model.matrix);
+            const transformedVertices = model.vertices.map(
+                vertex => Matrix.multiply([modelView, vertex])
+            );
 
-        // buildmper to project onto the view plane at z = -1
-        let mper = CG.mat4x4MPer();
-        
-        // build the matrix that converts projected coordinates into canvas pixels
-        let viewport = CG.mat4x4Viewport(
-            this.canvas.width,
-            this.canvas.height
-        );
-
-        // calculate the near clipping plane in canonical view coordinates
-        let zmin = -view.clip[4] / view.clip[5];
-
-        // go through each model
-        for (let i = 0; i < this.scene.models.length; i++) {
-            // get the current model
-            let model = this.scene.models[i];
-
-            // --------------------------------------------------
-            // Transform 3d models into the canonical view volume
-            // --------------------------------------------------
-
-            // apply the model transformation first and then nper
-            let transform = Matrix.multiply([nper, model.matrix]);
-
-            // store the transformed vertices
-            let canonicalVertices = [];
-
-            // go through each vertex
-            for (let j = 0; j < model.vertices.length; j++) {
-                // transform the vertex into canonical view coordinates
-                let vertex = Matrix.multiply([
-                    transform,
-                    model.vertices[j]
-                ]);
-
-                // add the transformed vertex to the array
-                canonicalVertices.push(vertex);
-            }
-
-            // go through each edge
-            for (let j = 0; j < model.edges.length; j++) {
-                // get the vertex indexes for this edge
-                let edge = model.edges[j];
-
-                // go through each line segment in the edge
-                for (let k = 0; k < edge.length - 1; k++) {
-                    // get the two endpoints in canonical view coordinates
-                    let line = {
-                        pt0: canonicalVertices[edge[k]], pt1: canonicalVertices[edge[k + 1]]
+            for (const edge of model.edges) {
+                for (let i = 0; i < edge.length - 1; i++) {
+                    const line = {
+                        pt0: transformedVertices[edge[i]],
+                        pt1: transformedVertices[edge[i + 1]]
                     };
-                    
-                    // clip the line in 3D (still needs clipping method implemented)
-                    let clippedLine = this.clipLinePerspective(line, zmin);
+                    const clipped = 
+            this.clipLinePerspective(line, -clip[4] / clip[5]);
+                
+                if (clipped === null) {
+                    continue;
+                }
 
-                    // skip line segments that are outside the view volume
-                    if (clippedLine === null) {
-                        continue;
-                    }
+                const projected0 = Matrix.multiply([projection, clipped.pt0]);
+                const projected1 = Matrix.multiply([projection, clipped.pt1]);
 
-                    // --------------------------------------------------------
-                    // Implement perspective projection onto the view plane
-                    // --------------------------------------------------------
+                const x0 = projected0.x / projected0.w;
+                const y0 = projected0.y / projected0.w;
+                const x1 = projected1.x / projected1.w;
+                const y1 = projected1.y / projected1.w;
+                const screen0 = Matrix.multiply([viewport,
+                    CG.Vector4(x0, y0, 0, 1)]);
+                const screen1 = Matrix.multiply([viewport,
+                    CG.Vector4(x1, y1, 0, 1)]);
 
-                    // project the first endpoint using mper
-                    let p0 = Matrix.multiply([mper, clippedLine.pt0]);
-
-                    // project the second endpoint using mper
-                    let p1 = Matrix.multiply([mper, clippedLine.pt1]);
-
-                    // divide first endpoint by w
-                    p0.scale(1 / p0.w);
-
-                    // divide second endpoint by w
-                    p1.scale(1 / p1.w);
-
-                    // --------------------------------------------------------
-                    // Convert projected coordinates into canvas 2d coordinates
-                    // --------------------------------------------------------
-
-                    // convert the first endpoint into canvas pixels
-                    let canvasP0 = Matrix.multiply([viewport, p0]);
-
-                    // convert the second endpoint into canvas pixels
-                    let canvasP1 = Matrix.multiply([viewport, p1]);
-
-                    // --------------------------------------------------------
-
-                    // draw the line using the canvas pixel coordinates
-                    this.drawLine(
-                        canvasP0.x,
-                        canvasP0.y,
-                        canvasP1.x,
-                        canvasP1.y
-                    );
+                    this.drawLine(screen0.x, screen0.y, screen1.x,
+                        screen1.y);
                 }
             }
         }
@@ -335,14 +336,62 @@ class Renderer {
     // z_min:        float (near clipping plane in canonical view volume)
     clipLinePerspective(line, z_min) {
         let result = null;
-        let p0 = Vector3(line.pt0.x, line.pt0.y, line.pt0.z); 
-        let p1 = Vector3(line.pt1.x, line.pt1.y, line.pt1.z);
+        let p0 = CG.Vector3(line.pt0.x, line.pt0.y, line.pt0.z); 
+        let p1 = CG.Vector3(line.pt1.x, line.pt1.y, line.pt1.z);
         let out0 = this.outcodePerspective(p0, z_min);
         let out1 = this.outcodePerspective(p1, z_min);
         
         // TODO: implement clipping here!
-        
-        return result;
+        while (true) {
+            if ((out0 | out1) === 0) {
+                return {
+                    pt0: CG.Vector4(p0.x, p0.y, p0.z, line.pt0.w),
+                    pt1: CG.Vector4(p1.x, p1.y, p1.z, line.pt1.w)
+                };
+            }
+
+            if ((out0 & out1) !== 0) {
+                return null;
+            }
+
+            const clipFirst = out0 !== 0;
+            const outsideCode = clipFirst ? out0 : out1;
+            const dx = p1.x - p0.x;
+            const dy = p1.y - p0.y;
+            const dz = p1.z - p0.z;
+            let t;
+
+            if ((outsideCode & NEAR) !== 0) {
+                t = (z_min - p0.z) / dz;
+            } else if ((outsideCode & FAR) !== 0) {
+                t = (-1 - p0.z) / dz;
+            } else if ((outsideCode & LEFT) !== 0) {
+                t = (p0.z - p0.x) / (dx - dz);
+            } else if((outsideCode & RIGHT) !== 0) {
+                t = (-p0.z - p0.x) / (dx + dz);
+            } else if ((outsideCode & TOP) !== 0) {
+                t = (-p0.z - p0.y) / (dy + dz);
+            } else if ((outsideCode & BOTTOM) !== 0) {
+                t = (p0.z - p0.y) / (dy - dz);
+            }
+            else {
+                return null;
+            }
+
+            const intersection = CG.Vector3(
+                p0.x + t * dx,
+                p0.y + t * dy,
+                p0.z + t * dz
+            );
+
+            if (clipFirst) {
+                p0 = intersection;
+                out0 = this.outcodePerspective(p0, z_min);
+            } else {
+                p1 = intersection;
+                out1 = this.outcodePerspective(p1, z_min);
+            }
+        }
     }
 
     //
